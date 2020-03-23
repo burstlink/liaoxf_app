@@ -14,15 +14,18 @@ logging.basicConfig(level=logging.INFO)
 
 
 def index(request):
-    return web.Response(body=b'<h1>Awesome</h1>', content_type='text')
+    return web.Response(body=b'<h1>Awesome</h1>', content_type='html/plain')
 
 
 async def init(loop):
-    app = web.Application(loop=loop)
-    app.router.add_route('GET', '/', index)
-    srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
+    app = web.Application()
+    app.add_routes([web.get('/', index)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, 'localhost', 9000)
+    await site.start()
     logging.info('Server started at http://127.0.0.1:9000...')
-    return srv
+
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
