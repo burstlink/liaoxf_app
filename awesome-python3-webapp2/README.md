@@ -1,2 +1,0 @@
-# awesome-python3-webapp2
-liaoxuefeng_python_webapp_project
