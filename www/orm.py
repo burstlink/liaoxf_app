@@ -1,22 +1,21 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# author:LeeYY
-# datetime:2018/9/11 0:10
 # software: PyCharm
-import asyncio
 import logging
 import aiomysql
 
 
-# 所谓ORM就是对象关系映射：对象模型表示的对象映射到基于SQL的关系模型数据库结构中去
 # 打印sql执行的log
-def log(sql, args=()):
+def log(sql):
     logging.info('SQL:%s ' % sql)
 
 
-# ----------------创建数据库线程池--------------------
+# 创建数据库连接池
+# async/await
+# async修饰function-->"异步函数"
+# 耗时的io操作(具有__await__属性或者一个异步的函数)--> await
 async def create_pool(loop, **kw):
-    logging.info("To create database connection pool...")
+    logging.info("create the database connection pool...")
     # 双下划线开头的成员是私有的，全局变量
     global __pool
     # kw.get方法后面是默认值
@@ -34,56 +33,57 @@ async def create_pool(loop, **kw):
     )
 
 
-# ----------------sql语句封装成函数begin---------------------
+# 数据库操作-查找
 async def select(sql, args, size=None):
-    log(sql, args)
-    global __pool
-    async with __pool.get() as conn:
+    log(sql)
+    # 从线程池获取数据库连接
+    async with __pool.acquire() as conn:
+        # 使用connection创建游标协程
         async with conn.cursor(aiomysql.DictCursor) as cur:
+            # 执行指定的sql语句操作(args是元组或者列表)
             await cur.execute(sql.replace('?', '%s'), args or ())
             if size:
                 rs = await cur.fetchmany(size)
             else:
                 rs = await cur.fetchall()
+            await cur.close()
         logging.info('rows returned: %s' % len(rs))
         return rs
 
 
+# 数据库操作-增删改
 async def execute(sql, args, autocommit=True):
     log(sql)
-    async with __pool.get() as conn:
+    async with __pool.acquire() as conn:
         if not autocommit:
-            # 如果不是自动提交，也就是autocommit=False的话，就conn.begin()，不知道啥意思
-            await conn.begin()  # 我猜可能是，不是自动连接数据库就连接数据库的意思
+            # 开始数据库操作(事务)的协程
+            await conn.begin()
         try:
             async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(sql.replace('?', '%s'), args)
-                affected = cur.rowcount  # affected是受影响的行数，比如说插入一行数据，那受影响行数就是一行
+                # 返回受影响的行数
+                affected = cur.rowcount
+            await cur.close()
             if not autocommit:
-                # 这边同样不知道是啥意思，如果不是自动提交那就手动提交？提交什么，提交到哪儿？猜都没法猜
+                # 提交数据库操作的协程
                 await conn.commit()
-        # 捕获数据库错误，但我不清楚具体是什么错误，为什么select函数不需要捕获？
         except BaseException as e:
+            # 数据库事务失败回滚
             if not autocommit:
-                # rollback是回滚的意思，那滚的是个什么玩意儿？不造啊
+                # 回滚数据库操作的协程
                 await conn.rollback()
-            raise
+            raise e
         return affected
 
 
-# ----------------sql语句封装成函数end---------------------
-
-
-# 这个函数在元类中被引用，作用是创建一定数量的占位符
+# num=3，那L就是['?','?','?']，返回一个字符串'?,?,?'
 def create_args_string(num):
-    L = []
+    tmp = []
     for n in range(num):
-        L.append('?')
-    # 比如说num=3，那L就是['?','?','?']，通过下面这句代码返回一个字符串'?,?,?'
-    return ', '.join(L)
+        tmp.append('?')
+    return ', '.join(tmp)
 
 
-# -----------数据基类以及派生数据类begin---------------
 class Field(object):
     def __init__(self, name, column_type, primary_key, default):
         self.name = name
@@ -119,8 +119,6 @@ class TextField(Field):
     def __init__(self, name=None, default=None):
         super().__init__(name, 'text', False, default)
 
-
-# -----------数据基类以及派生数据类over---------------
 
 class ModelMetaclass(type):
     def __new__(cls, name, bases, attrs):

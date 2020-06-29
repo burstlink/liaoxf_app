@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# author:LeeYY
-# datetime:2018/9/20 22:58
 # software: PyCharm
-'''
-Models for user, blog, comment.
-'''
-
+# Models for user, blog, comment.
 import time
 import uuid
 from orm import Model, StringField, BooleanField, FloatField, TextField
