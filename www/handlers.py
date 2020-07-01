@@ -293,6 +293,7 @@ async def api_register_user(*, email, name, passwd):
     user.passwd = '******'
     r.content_type = 'application/json'
     r.body = json.dumps(user, ensure_ascii=False).encode('utf-8')
+    logging.info("r.body: %s" % r.body)
     return r
 
 

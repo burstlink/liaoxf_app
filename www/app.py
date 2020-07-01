@@ -10,6 +10,7 @@ import orm
 from config import configs
 from datetime import datetime
 from aiohttp import web
+from handlers import cookie2user, COOKIE_NAME
 from jinja2 import Environment, FileSystemLoader
 from coroweb import add_routes, add_static
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +46,23 @@ async def logger_factory(app, handler):
         logging.info('Request: %s %s' % (request.method, request.path))
         return await handler(request)
     return logger
+
+
+# 添加request__user__，并对URL/manage/进行拦截，检查当前用户是否是管理员身份
+async def auth_factory(app, handler):
+    async def auth(request):
+        logging.info('check user: %s %s' % (request.method, request.path))
+        request.__user__ = None
+        cookie_str = request.cookies.get(COOKIE_NAME)
+        if cookie_str:
+            user = await cookie2user(cookie_str)
+            if user:
+                logging.info('set current user: %s' % user.email)
+                request.__user__ = user
+        if request.path.startswith('/manage/') and (request.__user__ is None or not request.__user__.admin):
+            return web.HTTPFound('/signin')
+        return (await handler(request))
+    return auth
 
 
 # 只有当请求方法为POST的时候这个函数才起作用
@@ -127,7 +145,7 @@ def datetime_filter(t):
 async def init(loop):
     await orm.create_pool(loop=loop, **configs.db)
     app = web.Application(loop=loop, middlewares=[
-        logger_factory, response_factory
+        logger_factory, auth_factory, response_factory
     ])
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routes(app, 'handlers')
