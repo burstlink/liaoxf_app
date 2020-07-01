@@ -1,23 +1,24 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# author:LeeYY
-# datetime:2018/9/10 22:58
 # software: PyCharm
 import logging
 import asyncio
 import os
 import json
 import time
+import orm
+from config import configs
 from datetime import datetime
 from aiohttp import web
 from jinja2 import Environment, FileSystemLoader
-import orm
 from coroweb import add_routes, add_static
 logging.basicConfig(level=logging.INFO)
 
 
+# 初始化jinja2
 def init_jinja2(app, **kw):
     logging.info("init jinja2...")
+    # 定义页面插入代码的标识，代码块、变量
     options = dict(autoescape=kw.get('autoescape', True),
                    block_start_string=kw.get('block_start_string', '{%'),
                    block_end_string=kw.get('block_end_string', '%}'),
@@ -25,10 +26,12 @@ def init_jinja2(app, **kw):
                    variable_end_string=kw.get('variable_end_string', '}}'),
                    auto_reload=kw.get('auto_reload', True)
                    )
+    # 加载templates下的页面
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates') \
         if kw.get('path', None) is None else kw.get('path', None)
     logging.info('set jinja2 template path: %s' % path)
     env = Environment(loader=FileSystemLoader(path), **options)
+    # 过滤某些文件
     filters = kw.get('filters', None)
     if filters is not None:
         for name, f in filters.items():
@@ -36,7 +39,7 @@ def init_jinja2(app, **kw):
     app['__templating__'] = env
 
 
-# 这个函数的作用就是当有http请求的时候，通过logging.info输出请求的信息，其中包括请求的方法和路径
+# 中间件，打印请求的方法和路径
 async def logger_factory(app, handler):
     async def logger(request):
         logging.info('Request: %s %s' % (request.method, request.path))
@@ -58,6 +61,7 @@ async def data_factory(app, handler):
     return parse_data
 
 
+# 对handler返回的response进行处理
 async def response_factory(app, handler):
     async def response(request):
         logging.info('Request handler...')
@@ -121,16 +125,18 @@ def datetime_filter(t):
 
 
 async def init(loop):
-    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='root', password='liyy1234', db='awesome')
+    await orm.create_pool(loop=loop, **configs.db)
     app = web.Application(loop=loop, middlewares=[
         logger_factory, response_factory
     ])
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routes(app, 'handlers')
     add_static(app)
-    srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
-    logging.info('Server started at http://127.0.0.1:9000...')
-    return srv
+    runner = web.AppRunner(app)
+    await runner.setup()
+    srv = web.TCPSite(runner, '127.0.0.1', 9000)
+    logging.info('server started at http://127.0.0.1:9000...')
+    await srv.start()
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

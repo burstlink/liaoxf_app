@@ -1,21 +1,12 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# author:LeeYY
-# datetime:2018/9/21 1:03
 # software: PyCharm
-'读取配置文件,优先从conffig_override.py读取'
 import config_default
+# 读取配置文件,优先从conffig_override.py读取
 
 
-# 自定义字典
 class Dict(dict):
-
     def __init__(self, names=(), values=(), **kw):
-        '''
-        initial funcion.
-        names: key in dict
-        values: value in dict
-        '''
         super(Dict, self).__init__(**kw)
         # 建立键值对关系
         for k, v in zip(names, values):
@@ -35,7 +26,8 @@ class Dict(dict):
 
 # 将默认配置文件与自定义配置文件进行混合
 def merge(defaults, override):
-    r = {}  # 创建一个空的字典,用于配置文件的融合,而不对任意配置文件做修改
+    r = {}
+    # 创建一个空的字典,用于配置文件的融合,而不对任意配置文件做修改
     # 1) 从默认配置文件取key,优先判断该key是否在自定义配置文件中有定义
     # 2) 若有,则判断value是否是字典,
     # 3) 若是字典,重复步骤1

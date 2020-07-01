@@ -1,12 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# author:LeeYY
-# datetime:2019/3/18 22:33
 # software: PyCharm
-"""
-Json API definition
-"""
-import json, logging, inspect, functools
 
 
 class APIError(Exception):
