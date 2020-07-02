@@ -124,7 +124,7 @@ class RequestHandler(object):
                 if not request.content_type:
                     return web.HTTPBadRequest(text='Missing Context-Type.')
                 ct = request.content_type.lower()
-                if ct.startswith('appliction/json'):
+                if ct.startswith('application/json'):
                     params = await request.json()
                     if not isinstance(params, dict):
                         return web.HTTPBadRequest(text='JSON body must be object.')
